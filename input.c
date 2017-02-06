@@ -1,5 +1,6 @@
-#include "definitions.h"
 #include "input.h"
+#include "definitions.h"
+#include "ui.h"
 
 //#define DEVICE_TYPENAME (const TCHAR*[3]) { L"mouse",L"keyboard",L"hid" }
 const TCHAR *dev_typename[] = { L"mouse",L"keyboard",L"hid" };
@@ -62,8 +63,9 @@ void inProcessRawInput(HRAWINPUT hRawInput) {
 
 	GetRawInputData(hRawInput, RID_INPUT, NULL, &sz, sizeof(RAWINPUTHEADER));
 	buf = malloc(sz);
-	if (GetRawInputData(hRawInput, RID_INPUT, buf, &sz, sizeof(RAWINPUTHEADER)) != sz)
+	if (GetRawInputData(hRawInput, RID_INPUT, buf, &sz, sizeof(RAWINPUTHEADER)) != sz) {
 		dprintf(L"WARNING: GetRawInputData returned bad size\n");
+	}
 	raw = (PRAWINPUT)buf;
 
 	if (raw->header.dwType == RIM_TYPEMOUSE) {
@@ -76,9 +78,10 @@ void inProcessRawInput(HRAWINPUT hRawInput) {
 		GetRawInputDeviceInfo(raw->header.hDevice, RIDI_DEVICENAME, devname, &datasz);
 		datasz = sizeof(RID_DEVICE_INFO);
 		GetRawInputDeviceInfo(raw->header.hDevice, RIDI_DEVICEINFO, &devinfo, &datasz);
-		dprintf(L"device: %d %s\n", devinfo.mouse.dwId, devname);
+		//dprintf(L"device: %d %s\n", devinfo.mouse.dwId, devname);
 	}
 
+	uiSetDevice(raw->header.hDevice);
 	//DefRawInputProc(&raw, 1, sizeof(RAWINPUTHEADER));
 	free(buf);
 }

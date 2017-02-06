@@ -17,23 +17,27 @@ HWND _window;
 **********/
 
 _ui_device_t *_getOrAddDevice(HANDLE hDevice) {
+	if (!hDevice)
+		return NULL;
+
 	for (UINT c = 0; c < _num_devices; c++) {
 		if (_devices[c].hDevice == hDevice)
-			return _devices[c];
+			return &_devices[c];
 	}
 
 	_ui_device_t *dev;
 	HINSTANCE hInstance = (HINSTANCE) GetWindowLong(_window, GWL_HINSTANCE);
-	dev = _devices[++num_devices];
+	dev = &_devices[_num_devices++];
 	dev->hDevice = hDevice;
 	inGetDeviceName(hDevice, dev->name, _tsizeof(dev->name));
+	dprintf(L"added device to ui: [%d] (%x) %s\n", _num_devices, hDevice, dev->name);
 
-	dev->label = CreateWindow(L"STATIC", L"Text Goes Here", WS_VISIBLE | WS_CHILD | SS_LEFT, 10, 10, 100, 100, _window, NULL, , NULL);
+	dev->label = CreateWindow(L"STATIC", dev->name, WS_VISIBLE | WS_CHILD | SS_LEFTNOWORDWRAP, 5, 5, 790, 50, _window, NULL, hInstance, NULL);
 	return dev;
 }
 
 LRESULT CALLBACK uiWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-	dprintf(L"wndproc: (%x) %x %x %x\n", (UINT)hWnd, uMsg, wParam, lParam);
+	//dprintf(L"wndproc: (%x) %x %x %x\n", (UINT)hWnd, uMsg, wParam, lParam);
 
 	switch (uMsg) {
 	case WM_CREATE:
@@ -56,6 +60,7 @@ LRESULT CALLBACK uiWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 HWND uiInit(HINSTANCE hInstance) {
 	WNDCLASS wc = { 0 };
 
+	_num_devices = 0;
 	wc.lpfnWndProc = uiWndProc;
 	wc.hInstance = hInstance;
 	wc.lpszClassName = UI_WINDOW_CLASS_NAME;
@@ -68,7 +73,7 @@ HWND uiInit(HINSTANCE hInstance) {
 		WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_VISIBLE,
 		CW_USEDEFAULT,
 		CW_USEDEFAULT,
-		400,
+		700,
 		150,
 		NULL,
 		NULL,
@@ -81,6 +86,8 @@ HWND uiInit(HINSTANCE hInstance) {
 
 BOOL uiSetDevice(HANDLE hDevice) {
 	_ui_device_t *dev = _getOrAddDevice(hDevice);
+	if (!dev)
+		return FALSE;
 
 	return TRUE;
 }
