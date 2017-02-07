@@ -1,11 +1,26 @@
 #include "ui.h"
 #include "input.h"
 
+#define ROW_HEIGHT 100
+
 typedef struct {
 	HANDLE hDevice;
 	TCHAR  name[256];
-	HWND   label;
-	HWND   speed;
+	struct {
+		HWND container;
+		struct {
+			HWND device;
+			HWND speed;
+			HWND accel;
+		} label;
+		struct {
+			HWND speed;
+			HWND accel[3];
+		} edit;
+		struct {
+			HWND save;
+		} button;
+	} ui;
 } _ui_device_t;
 
 _ui_device_t _devices[MAX_DEVICES] = { 0 };
@@ -17,6 +32,7 @@ HWND _window;
 **********/
 
 _ui_device_t *_getOrAddDevice(HANDLE hDevice) {
+#define ROFF ((_num_devices - 1) * ROW_HEIGHT) // row offset
 	if (!hDevice)
 		return NULL;
 
@@ -32,12 +48,26 @@ _ui_device_t *_getOrAddDevice(HANDLE hDevice) {
 	inGetDeviceName(hDevice, dev->name, _tsizeof(dev->name));
 	dprintf(L"added device to ui: [%d] (%x) %s\n", _num_devices, hDevice, dev->name);
 
-	dev->label = CreateWindow(L"STATIC", dev->name, WS_VISIBLE | WS_CHILD | SS_LEFTNOWORDWRAP, 5, 5, 790, 50, _window, NULL, hInstance, NULL);
+	// border
+	dev->ui.container = CreateWindow(L"STATIC", dev->name, WS_VISIBLE | WS_CHILD | SS_ETCHEDFRAME, 5, ROFF + 5, 680, 100, _window, NULL, hInstance, NULL);
+	// labels
+	dev->ui.label.device = CreateWindow(L"STATIC", dev->name, WS_VISIBLE | WS_CHILD | SS_LEFTNOWORDWRAP,  5, ROFF +  5, 670, 20, dev->ui.container, NULL, hInstance, NULL);
+	dev->ui.label.speed  = CreateWindow(L"STATIC", L"speed" , WS_VISIBLE | WS_CHILD | SS_LEFTNOWORDWRAP, 15, ROFF + 26,  50, 20, dev->ui.container, NULL, hInstance, NULL);
+	dev->ui.label.accel  = CreateWindow(L"STATIC", L"accel" , WS_VISIBLE | WS_CHILD | SS_LEFTNOWORDWRAP, 100, ROFF + 26,  50, 20, dev->ui.container, NULL, hInstance, NULL);
+	// edits
+	dev->ui.edit.speed    = CreateWindow(L"EDIT", L"6", WS_VISIBLE | WS_CHILD | WS_BORDER | ES_NUMBER | ES_CENTER, 60, ROFF + 25, 25, 20, dev->ui.container, NULL, hInstance, NULL);
+	dev->ui.edit.accel[0] = CreateWindow(L"EDIT", L"6", WS_VISIBLE | WS_CHILD | WS_BORDER | ES_NUMBER | ES_CENTER, 140, ROFF + 25, 25, 20, dev->ui.container, NULL, hInstance, NULL);
+	dev->ui.edit.accel[1] = CreateWindow(L"EDIT", L"6", WS_VISIBLE | WS_CHILD | WS_BORDER | ES_NUMBER | ES_CENTER, 170, ROFF + 25, 25, 20, dev->ui.container, NULL, hInstance, NULL);
+	dev->ui.edit.accel[2] = CreateWindow(L"EDIT", L"6", WS_VISIBLE | WS_CHILD | WS_BORDER | ES_NUMBER | ES_CENTER, 200, ROFF + 25, 25, 20, dev->ui.container, NULL, hInstance, NULL);
+	// buttons
+	dev->ui.button.save = CreateWindow(L"BUTTON", L"Save", WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON | BS_FLAT, 250, ROFF + 25, 40, 20, dev->ui.container, NULL, hInstance, NULL);
+
 	return dev;
+#undef VOFF
 }
 
 LRESULT CALLBACK uiWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-	//dprintf(L"wndproc: (%x) %x %x %x\n", (UINT)hWnd, uMsg, wParam, lParam);
+	dprintf(L"wndproc: (%x) %x %x %x\n", (UINT)hWnd, uMsg, wParam, lParam);
 
 	switch (uMsg) {
 	case WM_CREATE:
@@ -45,6 +75,9 @@ LRESULT CALLBACK uiWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 		break;
 	case WM_INPUT:
 		inProcessRawInput((HRAWINPUT)lParam);
+		break;
+	case WM_LBUTTONUP:
+		dprintf(L"clicked: (%x) %x %x %x\n", (UINT)hWnd, uMsg, wParam, lParam);
 		break;
 	default:
 		return DefWindowProc(hWnd, uMsg, wParam, lParam);
