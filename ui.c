@@ -1,13 +1,13 @@
 #include "ui.h"
 #include "input.h"
 
-#define ROW_HEIGHT 100
+#define PANE_HEIGHT 60
 
 typedef struct {
 	HANDLE hDevice;
 	TCHAR  name[256];
 	struct {
-		HWND container;
+		HWND pane;
 		struct {
 			HWND device;
 			HWND speed;
@@ -31,8 +31,10 @@ HWND _window;
 * STATIC *
 **********/
 
+LRESULT CALLBACK uiWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+
 _ui_device_t *_getOrAddDevice(HANDLE hDevice) {
-#define ROFF ((_num_devices - 1) * ROW_HEIGHT) // row offset
+#define ROFF ((_num_devices - 1) * PANE_HEIGHT) // row offset
 	if (!hDevice)
 		return NULL;
 
@@ -49,18 +51,19 @@ _ui_device_t *_getOrAddDevice(HANDLE hDevice) {
 	dprintf(L"added device to ui: [%d] (%x) %s\n", _num_devices, hDevice, dev->name);
 
 	// border
-	dev->ui.container = CreateWindow(L"STATIC", dev->name, WS_VISIBLE | WS_CHILD | SS_ETCHEDFRAME, 5, ROFF + 5, 680, 100, _window, NULL, hInstance, NULL);
+	dev->ui.pane = CreateWindow(L"STATIC", dev->name, WS_VISIBLE | WS_CHILD | SS_ETCHEDFRAME, 5, ROFF + 5, 680, PANE_HEIGHT, _window, NULL, hInstance, NULL);
 	// labels
-	dev->ui.label.device = CreateWindow(L"STATIC", dev->name, WS_VISIBLE | WS_CHILD | SS_LEFTNOWORDWRAP,  5, ROFF +  5, 670, 20, dev->ui.container, NULL, hInstance, NULL);
-	dev->ui.label.speed  = CreateWindow(L"STATIC", L"speed" , WS_VISIBLE | WS_CHILD | SS_LEFTNOWORDWRAP, 15, ROFF + 26,  50, 20, dev->ui.container, NULL, hInstance, NULL);
-	dev->ui.label.accel  = CreateWindow(L"STATIC", L"accel" , WS_VISIBLE | WS_CHILD | SS_LEFTNOWORDWRAP, 100, ROFF + 26,  50, 20, dev->ui.container, NULL, hInstance, NULL);
+	dev->ui.label.device = CreateWindow(L"STATIC", dev->name, WS_VISIBLE | WS_CHILD | SS_LEFTNOWORDWRAP,  5,   5, 670, 20, dev->ui.pane, NULL, hInstance, NULL);
+	dev->ui.label.speed  = CreateWindow(L"STATIC", L"speed" , WS_VISIBLE | WS_CHILD | SS_LEFTNOWORDWRAP, 15,  26,  50, 20, dev->ui.pane, NULL, hInstance, NULL);
+	dev->ui.label.accel  = CreateWindow(L"STATIC", L"accel" , WS_VISIBLE | WS_CHILD | SS_LEFTNOWORDWRAP, 100, 26,  50, 20, dev->ui.pane, NULL, hInstance, NULL);
 	// edits
-	dev->ui.edit.speed    = CreateWindow(L"EDIT", L"6", WS_VISIBLE | WS_CHILD | WS_BORDER | ES_NUMBER | ES_CENTER, 60, ROFF + 25, 25, 20, dev->ui.container, NULL, hInstance, NULL);
-	dev->ui.edit.accel[0] = CreateWindow(L"EDIT", L"6", WS_VISIBLE | WS_CHILD | WS_BORDER | ES_NUMBER | ES_CENTER, 140, ROFF + 25, 25, 20, dev->ui.container, NULL, hInstance, NULL);
-	dev->ui.edit.accel[1] = CreateWindow(L"EDIT", L"6", WS_VISIBLE | WS_CHILD | WS_BORDER | ES_NUMBER | ES_CENTER, 170, ROFF + 25, 25, 20, dev->ui.container, NULL, hInstance, NULL);
-	dev->ui.edit.accel[2] = CreateWindow(L"EDIT", L"6", WS_VISIBLE | WS_CHILD | WS_BORDER | ES_NUMBER | ES_CENTER, 200, ROFF + 25, 25, 20, dev->ui.container, NULL, hInstance, NULL);
+	dev->ui.edit.speed    = CreateWindow(L"EDIT", L"6", WS_VISIBLE | WS_CHILD | WS_TABSTOP | WS_BORDER | ES_NUMBER | ES_CENTER, 60,  25, 25, 20, dev->ui.pane, NULL, hInstance, NULL);
+	dev->ui.edit.accel[0] = CreateWindow(L"EDIT", L"6", WS_VISIBLE | WS_CHILD | WS_TABSTOP | WS_BORDER | ES_NUMBER | ES_CENTER, 140, 25, 25, 20, dev->ui.pane, NULL, hInstance, NULL);
+	dev->ui.edit.accel[1] = CreateWindow(L"EDIT", L"6", WS_VISIBLE | WS_CHILD | WS_TABSTOP | WS_BORDER | ES_NUMBER | ES_CENTER, 170, 25, 25, 20, dev->ui.pane, NULL, hInstance, NULL);
+	dev->ui.edit.accel[2] = CreateWindow(L"EDIT", L"6", WS_VISIBLE | WS_CHILD | WS_TABSTOP | WS_BORDER | ES_NUMBER | ES_CENTER, 200, 25, 25, 20, dev->ui.pane, NULL, hInstance, NULL);
 	// buttons
-	dev->ui.button.save = CreateWindow(L"BUTTON", L"Save", WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON | BS_FLAT, 250, ROFF + 25, 40, 20, dev->ui.container, NULL, hInstance, NULL);
+	dev->ui.button.save = CreateWindow(L"BUTTON", L"Save", WS_VISIBLE | WS_CHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_FLAT, 250, 25, 40, 20, dev->ui.pane, NULL, hInstance, NULL);
+	//SetWindowLongPtr(dev->ui.button.save, GWLP_WNDPROC, (LONG) uiWndProc);
 
 	return dev;
 #undef VOFF
@@ -107,7 +110,7 @@ HWND uiInit(HINSTANCE hInstance) {
 		CW_USEDEFAULT,
 		CW_USEDEFAULT,
 		700,
-		150,
+		200,
 		NULL,
 		NULL,
 		hInstance,
