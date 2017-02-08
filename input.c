@@ -5,7 +5,13 @@
 //#define DEVICE_TYPENAME (const TCHAR*[3]) { L"mouse",L"keyboard",L"hid" }
 const TCHAR *dev_typename[] = { L"mouse",L"keyboard",L"hid" };
 
-HANDLE devices[MAX_DEVICES];
+typedef struct {
+	HANDLE hDevice;
+	UINT speed;
+	UINT accel[3];
+} _devinfo_t;
+
+_devinfo_t _devices[MAX_DEVICES];
 
 void inPrintDevices(void) {
 	UINT num_devices;
@@ -57,20 +63,22 @@ BOOL inRegisterMice(HWND hWnd) {
 }
 
 void inProcessRawInput(HRAWINPUT hRawInput) {
-	UINT      sz;
-	LPBYTE    buf;
-	PRAWINPUT raw;
+	UINT     sz;
+	RAWINPUT raw;
 
 	GetRawInputData(hRawInput, RID_INPUT, NULL, &sz, sizeof(RAWINPUTHEADER));
-	buf = malloc(sz);
-	if (GetRawInputData(hRawInput, RID_INPUT, buf, &sz, sizeof(RAWINPUTHEADER)) != sz) {
-		dprintf(L"WARNING: GetRawInputData returned bad size\n");
+	if (sz > sizeof(raw)) {
+		dprintf(L"raw input buf is too small\n");
+		return;
 	}
-	raw = (PRAWINPUT)buf;
+	if (GetRawInputData(hRawInput, RID_INPUT, &raw, &sz, sizeof(RAWINPUTHEADER)) != sz) {
+		dprintf(L"WARNING: GetRawInputData returned bad size\n");
+		return;
+	}
 
-	if (raw->header.dwType == RIM_TYPEMOUSE) {
+	if (raw.header.dwType == RIM_TYPEMOUSE) {
 		//dprintf(L"device: %x\n", raw->header.hDevice);
-		UINT            datasz = 256;
+		/*UINT            datasz = 256;
 		TCHAR           devname[256] = { 0 };
 		RID_DEVICE_INFO devinfo;
 
@@ -78,10 +86,20 @@ void inProcessRawInput(HRAWINPUT hRawInput) {
 		GetRawInputDeviceInfo(raw->header.hDevice, RIDI_DEVICENAME, devname, &datasz);
 		datasz = sizeof(RID_DEVICE_INFO);
 		GetRawInputDeviceInfo(raw->header.hDevice, RIDI_DEVICEINFO, &devinfo, &datasz);
-		//dprintf(L"device: %d %s\n", devinfo.mouse.dwId, devname);
+		dprintf(L"device: %d %s\n", devinfo.mouse.dwId, devname);*/
+
+
+		uiSetDevice(raw.header.hDevice);
 	}
 
-	uiSetDevice(raw->header.hDevice);
 	//DefRawInputProc(&raw, 1, sizeof(RAWINPUTHEADER));
-	free(buf);
+}
+
+BOOL inSetDeviceSpeed(UINT speed, UINT accel1, UINT accel2, UINT accel3) {
+	UINT accel[3];
+	accel[0] = accel1;
+	accel[1] = accel2;
+	accel[2] = accel3;
+
+	return TRUE;
 }
