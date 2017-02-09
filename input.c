@@ -11,7 +11,23 @@ typedef struct {
 	UINT accel[3];
 } _devinfo_t;
 
-_devinfo_t _devices[MAX_DEVICES];
+static _devinfo_t _devices[MAX_DEVICES];
+static UINT _num_devices = 0;
+
+
+
+static _devinfo_t *_getDeviceByHandle(HANDLE hDevice) {
+	for (UINT c = 0; c < _num_devices; c++) {
+		if (_devices[c].hDevice == hDevice)
+			return &_devices[c];
+	}
+
+	return NULL;
+}
+
+static _devinfo_t *_addDevice(HANDLE hDevice) {
+	return (_devices[++_num_devices].hDevice = hDevice);
+}
 
 void inPrintDevices(void) {
 	UINT num_devices;
@@ -88,18 +104,28 @@ void inProcessRawInput(HRAWINPUT hRawInput) {
 		GetRawInputDeviceInfo(raw->header.hDevice, RIDI_DEVICEINFO, &devinfo, &datasz);
 		dprintf(L"device: %d %s\n", devinfo.mouse.dwId, devname);*/
 
-
-		uiSetDevice(raw.header.hDevice);
+		if (!_getDeviceByHandle(raw.header.hDevice)) {
+			_addDevice(raw.header.hDevice);
+		}
+		uiSetDevice(raw.header.hDevice); // ui maintains it's own device cache, can call without checking ours
 	}
 
 	//DefRawInputProc(&raw, 1, sizeof(RAWINPUTHEADER));
 }
 
-BOOL inSetDeviceSpeed(UINT speed, UINT accel1, UINT accel2, UINT accel3) {
+BOOL inSetDeviceSpeed(HANDLE hDevice, UINT speed, UINT accel1, UINT accel2, UINT accel3) {
 	UINT accel[3];
+	_devinfo_t *dev;
+
+	dev = _getDeviceByHandle(hDevice);
+	if (!dev)
+		return FALSE;
+
 	accel[0] = accel1;
 	accel[1] = accel2;
 	accel[2] = accel3;
 
+	dprintf(L"mouseparams: speed: %u accel: %u %u %u\n", speed, accel1, accel2, accel3);
+	//return SystemParametersInfo(SPI_SETMOUSESPEED, 0, (PVOID)*speed, SPIF_SENDCHANGE) & SystemParametersInfo(SPI_SETMOUSE, 0, accel, SPIF_SENDCHANGE);
 	return TRUE;
 }
