@@ -4,9 +4,9 @@
 #define WINDOW_WIDTH 700
 #define PANE_HEIGHT 55
 
-#define WINDOW_BG_COLOR  RGB(240,240,240)
-#define INACTIVE_PANE_BG RGB(255,240,240)
-#define ACTIVE_PANE_BG   RGB(240,255,240)
+#define WINDOW_COLOR   RGB(240,240,240)
+#define INACTIVE_COLOR RGB(255,230,230)
+#define ACTIVE_COLOR   RGB(230,255,230)
 
 typedef struct {
 	BOOL isActive;
@@ -30,11 +30,16 @@ typedef struct {
 	} ui;
 } _ui_device_t;
 
+struct {
+	HBRUSH window;
+	HBRUSH active;
+	HBRUSH inactive;
+} _fills;
+
 _ui_device_t _devices[MAX_DEVICES] = { 0 };
 _ui_device_t *_active_device = NULL;
 UINT _num_devices = 0;
 HWND _window;
-HBRUSH _brush;
 
 /*************
 * PROTOTYPES *
@@ -108,15 +113,15 @@ void _createDevicePane(_ui_device_t *device) {
 	wc.lpfnWndProc = _paneWndProc;
 	wc.hbrBackground = (HBRUSH)COLOR_WINDOW;
 	RegisterClass(&wc);*/
-	device->ui.pane = CreateWindow(L"STATIC", L"", WS_VISIBLE | WS_CHILD | SS_ETCHEDFRAME , 5, ROFF + 5, 678, PANE_HEIGHT, _window, NULL, hInstance, NULL);
+	device->ui.pane = CreateWindow(L"STATIC", L"", WS_VISIBLE | WS_CHILD, 5, ROFF + 5, 678, PANE_HEIGHT, _window, NULL, hInstance, NULL);
 	device->ui.oldproc = (WNDPROC)SetWindowLongPtr(device->ui.pane, GWLP_WNDPROC, (LONG)_paneWndProc);
 	dprintf(L"device pane: %x\n", (UINT)device->ui.pane);
 	/*dprintf(L"myproc %x\n", _paneWndProc);
 	dprintf(L"oldproc %x\n", device->ui.oldproc);*/
 	// labels
-	device->ui.label.device = CreateWindow(L"STATIC", device->name, WS_VISIBLE | WS_CHILD | SS_LEFTNOWORDWRAP, 5, 5, 665, 18, device->ui.pane, NULL, hInstance, NULL);
-	device->ui.label.speed = CreateWindow(L"STATIC", L"speed", WS_VISIBLE | WS_CHILD | SS_LEFTNOWORDWRAP, 15, 26, 40, 18, device->ui.pane, NULL, hInstance, NULL);
-	device->ui.label.accel = CreateWindow(L"STATIC", L"accel", WS_VISIBLE | WS_CHILD | SS_LEFTNOWORDWRAP, 100, 26, 35, 18, device->ui.pane, NULL, hInstance, NULL);
+	device->ui.label.device = CreateWindow(L"STATIC", device->name, WS_VISIBLE | WS_CHILD | SS_NOPREFIX | SS_LEFTNOWORDWRAP, 5, 5, 665, 18, device->ui.pane, NULL, hInstance, NULL);
+	device->ui.label.speed = CreateWindow(L"STATIC", L"speed", WS_VISIBLE | WS_CHILD | SS_NOPREFIX | SS_LEFTNOWORDWRAP, 15, 26, 40, 18, device->ui.pane, NULL, hInstance, NULL);
+	device->ui.label.accel = CreateWindow(L"STATIC", L"accel", WS_VISIBLE | WS_CHILD | SS_NOPREFIX | SS_LEFTNOWORDWRAP, 100, 26, 35, 18, device->ui.pane, NULL, hInstance, NULL);
 	// edits
 	device->ui.edit.speed = CreateWindow(L"EDIT", L"6", WS_VISIBLE | WS_CHILD | WS_TABSTOP | WS_BORDER | ES_NUMBER | ES_CENTER, 60, 25, 25, 20, device->ui.pane, NULL, hInstance, NULL);
 	device->ui.edit.accel[0] = CreateWindow(L"EDIT", L"6", WS_VISIBLE | WS_CHILD | WS_TABSTOP | WS_BORDER | ES_NUMBER | ES_CENTER, 140, 25, 25, 20, device->ui.pane, NULL, hInstance, NULL);
@@ -154,16 +159,17 @@ LRESULT CALLBACK _WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 		if (dev) {
 			if (dev == _active_device) {
 				//dprintf(L"pane dev: %x\n", dev->name);
-				SetBkColor((HDC)wParam, ACTIVE_PANE_BG);
+				SetBkColor((HDC)wParam, ACTIVE_COLOR);
+				return (INT_PTR)_fills.active;
 			} else {
-				SetBkColor((HDC)wParam, INACTIVE_PANE_BG);
+				SetBkColor((HDC)wParam, INACTIVE_COLOR);
+				return (INT_PTR)_fills.inactive;
 			}
 		} else {
-			SetBkColor((HDC)wParam, WINDOW_BG_COLOR);
+			SetBkColor((HDC)wParam, WINDOW_COLOR);
+			return (INT_PTR)_fills.active;
 		}
-		SetTextColor((HDC)wParam, RGB(0, 0, 0));
-
-		return (BOOL)GetStockObject(LTGRAY_BRUSH);
+		//SetTextColor((HDC)wParam, RGB(0, 0, 0));
 	case WM_INPUT:
 		inProcessRawInput((HRAWINPUT)lParam);
 		break;
@@ -187,20 +193,19 @@ LRESULT CALLBACK _paneWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam
 	switch (uMsg) {
 	case WM_COMMAND:
 		dprintf(L"sWM_COMMAND: (%x) %x %x %x\n", (UINT)hWnd, uMsg, wParam, lParam);
-		/*if ((dev = _getDeviceBySaveHwnd((HWND)lParam)) == NULL)
-		break;*/
-		dprintf(L"saving %s\n", dev->name);
+		if ((HWND)lParam == dev->ui.button.save) {
+			dprintf(L"saving %s\n", dev->name);
+		}
 		break;
 	case WM_CTLCOLORSTATIC:
 		dprintf(L"sWM_CTLCOLORSTATIC: (%x) %x %x %x\n", (UINT)hWnd, uMsg, wParam, lParam);
 		if (dev == _active_device) {
-			SetBkColor((HDC)wParam, ACTIVE_PANE_BG);
+			SetBkColor((HDC)wParam, ACTIVE_COLOR);
+			return (INT_PTR)_fills.active;
 		} else {
-			SetBkColor((HDC)wParam, INACTIVE_PANE_BG);
+			SetBkColor((HDC)wParam, INACTIVE_COLOR);
+			return (INT_PTR)_fills.inactive;
 		}
-		SetTextColor((HDC)wParam, RGB(0, 0, 0));
-
-		return (BOOL)GetStockObject(LTGRAY_BRUSH);
 	case WM_CTLCOLOREDIT:
 	case WM_CTLCOLORBTN:
 		//dprintf(L"sWM_CTLCOLOR*: (%x) %x %x %x\n", (UINT)hWnd, uMsg, wParam, lParam);
@@ -210,7 +215,7 @@ LRESULT CALLBACK _paneWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam
 		break;
 	case WM_ERASEBKGND:
 		dprintf(L"sWM_ERASEBKGND: (%x) %x %x %x\n", (UINT)hWnd, uMsg, wParam, lParam);
-		SetBkColor((HDC)wParam, ACTIVE_PANE_BG);
+		SetBkColor((HDC)wParam, ACTIVE_COLOR);
 		return 0;
 	}
 	return CallWindowProc(dev->ui.oldproc, hWnd, uMsg, wParam, lParam);
@@ -225,14 +230,15 @@ HWND uiInit(HINSTANCE hInstance) {
 
 	_num_devices = 0;
 	_active_device = NULL;
-	_brush = CreateSolidBrush(ACTIVE_PANE_BG);
+	_fills.window = CreateSolidBrush(WINDOW_COLOR);
+	_fills.active = CreateSolidBrush(ACTIVE_COLOR);
+	_fills.inactive = CreateSolidBrush(INACTIVE_COLOR);
 
 	wc.lpfnWndProc = _WndProc;
 	wc.hInstance = hInstance;
 	wc.lpszClassName = UI_WINDOW_CLASS_NAME;
 	wc.hbrBackground = (HBRUSH) COLOR_BACKGROUND;
 	CHECK_ERROR_EXIT(RegisterClass(&wc) == 0, -1, L"could not register class"); // now that the class is registered we create the window
-	/*_window = CreateWindow(wc.lpszClassName, NULL, 0, 0, 0, 0, 0, HWND_MESSAGE, NULL, hInstance, NULL);*/
 	_window = CreateWindowEx(
 		0,
 		wc.lpszClassName,
