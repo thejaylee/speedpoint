@@ -1,5 +1,5 @@
 #include "ui.h"
-#include "input.h"
+#include "device.h"
 
 #define WINDOW_WIDTH 400
 #define PANE_HEIGHT 55
@@ -9,9 +9,8 @@
 #define ACTIVE_COLOR   RGB(230,245,230)
 
 typedef struct {
-	BOOL isActive;
-	HANDLE hDevice;
-	TCHAR  name[256];
+	device_info_t *devinfo;
+	TCHAR  nice_name[256];
 	struct {
 		HWND pane;
 		WNDPROC oldproc;
@@ -28,7 +27,7 @@ typedef struct {
 			HWND set;
 		} button;
 	} ui;
-} _ui_device_t;
+} _device_pane_t;
 
 static struct {
 	HBRUSH window;
@@ -36,8 +35,8 @@ static struct {
 	HBRUSH inactive;
 } _fills;
 
-static _ui_device_t _devices[MAX_DEVICES] = { 0 };
-static _ui_device_t *_active_device = NULL;
+static _device_pane_t _devpanes[MAX_DEVICES] = { 0 };
+static _device_pane_t *_active_pane = NULL;
 static UINT _num_devices = 0;
 static HWND _window;
 
@@ -51,64 +50,64 @@ static LRESULT CALLBACK _paneWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
 * STATIC *
 **********/
 
-static _ui_device_t* _getDeviceByBtnHwnd(HWND hWnd) {
+static _device_pane_t *_devPaneByBtnHwnd(HWND hWnd) {
 	for (UINT c = 0; c<_num_devices; c++) {
-		if (hWnd == _devices[c].ui.button.set)
-			return &_devices[c];
+		if (hWnd == _devpanes[c].ui.button.set)
+			return &_devpanes[c];
 	}
 	return NULL;
 }
 
-static _ui_device_t* _getDeviceByPane(HWND hWnd) {
+static _device_pane_t *_devPaneByHwnd(HWND hWnd) {
 	for (UINT c = 0; c < _num_devices; c++) {
-		if (_devices[c].ui.pane == hWnd)
-			return &_devices[c];
+		if (_devpanes[c].ui.pane == hWnd)
+			return &_devpanes[c];
 	}
 
 	return NULL;
 }
 
-static _ui_device_t* _getDeviceByHandle(HANDLE hDevice) {
+static _device_pane_t *_devPaneByDevInfo(device_info_t *devinfo) {
 	for (UINT c = 0; c < _num_devices; c++) {
-		if (_devices[c].hDevice == hDevice)
-			return &_devices[c];
+		if (_devpanes[c].devinfo == devinfo)
+			return &_devpanes[c];
 	}
 
 	return NULL;
 }
 
-static _ui_device_t* _addDevice(HANDLE hDevice) {
-	TCHAR fullname[256], *end;
-	_ui_device_t *dev = &_devices[_num_devices++];
-	dev->hDevice = hDevice;
+static _device_pane_t* _addDevicePane(device_info_t *devinfo) {
+	TCHAR *end;
+	_device_pane_t *devpane = &_devpanes[_num_devices++];
+	devpane->devinfo = devinfo;
 	// set the (display) device name to only the relevant bits
-	inGetDeviceName(hDevice, fullname, _tsizeof(fullname));
-	for (end = fullname; *end != L'{' && end < fullname + sizeof(fullname); end++);
-	_tcsncpy_s(dev->name, _tsizeof(dev->name), &fullname[4], (end - &fullname[4]));
-	return dev;
+	for (end = devinfo->name; *end != L'{' && end < devinfo->name+ sizeof(devinfo->name); end++);
+	_tcsncpy_s(devpane->nice_name, _tsizeof(devpane->nice_name), &devinfo->name[4], (end - &devinfo->name[4]));
+	return devpane;
 }
 
 /**
 * @returns FALSE is device is already active device. TRUE if set as new active device
 */
-static BOOL _setActive(_ui_device_t *device) {
-	if (_active_device == device)
+static BOOL _setActivePane(_device_pane_t *devpane) {
+	if (_active_pane == devpane)
 		return FALSE;
 	
-	_active_device = device;
+	_active_pane = devpane;
 	for (UINT c = 0; c < _num_devices; c++) {
-		if (_devices[c].ui.pane) {
-			InvalidateRect(_devices[c].ui.pane, NULL, TRUE);
-			UpdateWindow(_devices[c].ui.pane);
+		if (_devpanes[c].ui.pane) {
+			InvalidateRect(_devpanes[c].ui.pane, NULL, TRUE);
+			UpdateWindow(_devpanes[c].ui.pane);
 		}
 	}
-	dprintf(L"active device: %s\n", device->name);
+	dprintf(L"active device: %s\n", devpane->nice_name);
 	return TRUE;
 }
 
-static void _createDevicePane(_ui_device_t *device) {
+static void _createDevicePane(_device_pane_t *devpane) {
 #define ROFF ((_num_devices - 1) * PANE_HEIGHT) // row offset
 	HINSTANCE hInstance = (HINSTANCE)GetWindowLong(_window, GWL_HINSTANCE);
+	TCHAR buf[16];
 
 	// border
 	/*WNDCLASS wc;
@@ -117,22 +116,24 @@ static void _createDevicePane(_ui_device_t *device) {
 	wc.lpfnWndProc = _paneWndProc;
 	wc.hbrBackground = (HBRUSH)COLOR_WINDOW;
 	RegisterClass(&wc);*/
-	device->ui.pane = CreateWindow(L"STATIC", L"", WS_VISIBLE | WS_CHILD, 5, ROFF + 5, WINDOW_WIDTH - 22, PANE_HEIGHT, _window, NULL, hInstance, NULL);
-	device->ui.oldproc = (WNDPROC)SetWindowLongPtr(device->ui.pane, GWLP_WNDPROC, (LONG)_paneWndProc);
-	dprintf(L"device pane: %x\n", (UINT)device->ui.pane);
-	/*dprintf(L"myproc %x\n", _paneWndProc);
-	dprintf(L"oldproc %x\n", device->ui.oldproc);*/
+	devpane->ui.pane = CreateWindow(L"STATIC", L"", WS_VISIBLE | WS_CHILD, 5, ROFF + 5, WINDOW_WIDTH - 22, PANE_HEIGHT, _window, NULL, hInstance, NULL);
+	devpane->ui.oldproc = (WNDPROC)SetWindowLongPtr(devpane->ui.pane, GWLP_WNDPROC, (LONG)_paneWndProc);
+	dprintf(L"devpane pane: %x\n", (UINT)devpane->ui.pane);
 	// labels
-	device->ui.label.device = CreateWindow(L"STATIC", device->name, WS_VISIBLE | WS_CHILD | SS_NOPREFIX | SS_LEFTNOWORDWRAP, 5, 5, WINDOW_WIDTH - 25, 18, device->ui.pane, NULL, hInstance, NULL);
-	device->ui.label.speed = CreateWindow(L"STATIC", L"speed", WS_VISIBLE | WS_CHILD | SS_NOPREFIX | SS_LEFTNOWORDWRAP, 15, 26, 40, 18, device->ui.pane, NULL, hInstance, NULL);
-	device->ui.label.accel = CreateWindow(L"STATIC", L"accel", WS_VISIBLE | WS_CHILD | SS_NOPREFIX | SS_LEFTNOWORDWRAP, 100, 26, 35, 18, device->ui.pane, NULL, hInstance, NULL);
+	devpane->ui.label.device = CreateWindow(L"STATIC", devpane->nice_name, WS_VISIBLE | WS_CHILD | SS_NOPREFIX | SS_LEFTNOWORDWRAP, 5, 5, WINDOW_WIDTH - 25, 18, devpane->ui.pane, NULL, hInstance, NULL);
+	devpane->ui.label.speed = CreateWindow(L"STATIC", L"speed", WS_VISIBLE | WS_CHILD | SS_NOPREFIX | SS_LEFTNOWORDWRAP, 15, 28, 40, 18, devpane->ui.pane, NULL, hInstance, NULL);
+	devpane->ui.label.accel = CreateWindow(L"STATIC", L"accel", WS_VISIBLE | WS_CHILD | SS_NOPREFIX | SS_LEFTNOWORDWRAP, 100, 28, 35, 18, devpane->ui.pane, NULL, hInstance, NULL);
 	// edits
-	device->ui.edit.speed = CreateWindow(L"EDIT", L"6", WS_VISIBLE | WS_CHILD | WS_TABSTOP | WS_BORDER | ES_NUMBER | ES_CENTER, 60, 25, 25, 20, device->ui.pane, NULL, hInstance, NULL);
-	device->ui.edit.accel[0] = CreateWindow(L"EDIT", L"4", WS_VISIBLE | WS_CHILD | WS_TABSTOP | WS_BORDER | ES_NUMBER | ES_CENTER, 140, 25, 25, 20, device->ui.pane, NULL, hInstance, NULL);
-	device->ui.edit.accel[1] = CreateWindow(L"EDIT", L"10", WS_VISIBLE | WS_CHILD | WS_TABSTOP | WS_BORDER | ES_NUMBER | ES_CENTER, 170, 25, 25, 20, device->ui.pane, NULL, hInstance, NULL);
-	device->ui.edit.accel[2] = CreateWindow(L"EDIT", L"0", WS_VISIBLE | WS_CHILD | WS_TABSTOP | WS_BORDER | ES_NUMBER | ES_CENTER, 200, 25, 25, 20, device->ui.pane, NULL, hInstance, NULL);
+	_stprintf_s(buf, _tsizeof(buf), L"%d", devpane->devinfo->speed);
+	devpane->ui.edit.speed = CreateWindow(L"EDIT", buf, WS_VISIBLE | WS_CHILD | WS_TABSTOP | WS_BORDER | ES_NUMBER | ES_CENTER, 60, 27, 25, 20, devpane->ui.pane, NULL, hInstance, NULL);
+	_stprintf_s(buf, _tsizeof(buf), L"%d", devpane->devinfo->accel[0]);
+	devpane->ui.edit.accel[0] = CreateWindow(L"EDIT", buf, WS_VISIBLE | WS_CHILD | WS_TABSTOP | WS_BORDER | ES_NUMBER | ES_CENTER, 140, 27, 25, 20, devpane->ui.pane, NULL, hInstance, NULL);
+	_stprintf_s(buf, _tsizeof(buf), L"%d", devpane->devinfo->accel[1]);
+	devpane->ui.edit.accel[1] = CreateWindow(L"EDIT", buf, WS_VISIBLE | WS_CHILD | WS_TABSTOP | WS_BORDER | ES_NUMBER | ES_CENTER, 170, 27, 25, 20, devpane->ui.pane, NULL, hInstance, NULL);
+	_stprintf_s(buf, _tsizeof(buf), L"%d", devpane->devinfo->accel[2]);
+	devpane->ui.edit.accel[2] = CreateWindow(L"EDIT", buf, WS_VISIBLE | WS_CHILD | WS_TABSTOP | WS_BORDER | ES_NUMBER | ES_CENTER, 200, 27, 25, 20, devpane->ui.pane, NULL, hInstance, NULL);
 	// buttons
-	device->ui.button.set = CreateWindow(L"BUTTON", L"Set", WS_VISIBLE | WS_CHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_FLAT, 250, 25, 40, 20, device->ui.pane, NULL, hInstance, NULL);
+	devpane->ui.button.set = CreateWindow(L"BUTTON", L"Set", WS_VISIBLE | WS_CHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_FLAT, 325, 27, 40, 20, devpane->ui.pane, NULL, hInstance, NULL);
 
 	RECT r;
 	GetWindowRect(_window, &r);
@@ -143,24 +144,24 @@ static void _createDevicePane(_ui_device_t *device) {
 	/*InvalidateRect(device->ui.pane, NULL, TRUE);
 	UpdateWindow(device->ui.pane);*/
 	
-	dprintf(L"added device to ui: [%d] (%x) %s\n", _num_devices, (UINT)device->hDevice, device->name);
+	dprintf(L"added device to ui: [%d] (%x) %s\n", _num_devices, (UINT)devpane->devinfo->hDevice, devpane->nice_name);
 #undef VOFF
 }
 
-static void _updateSettings(_ui_device_t *device) {
+static void _updateSettings(_device_pane_t *devpane) {
 	TCHAR buf[16];
 	UINT speed, accel[3];
 
-	GetWindowText(device->ui.edit.speed, buf, _tsizeof(buf));
+	GetWindowText(devpane->ui.edit.speed, buf, _tsizeof(buf));
 	speed = _tstoi(buf);
-	GetWindowText(device->ui.edit.accel[0], buf, _tsizeof(buf));
+	GetWindowText(devpane->ui.edit.accel[0], buf, _tsizeof(buf));
 	accel[0] = _tstoi(buf);
-	GetWindowText(device->ui.edit.accel[1], buf, _tsizeof(buf));
+	GetWindowText(devpane->ui.edit.accel[1], buf, _tsizeof(buf));
 	accel[1] = _tstoi(buf);
-	GetWindowText(device->ui.edit.accel[2], buf, _tsizeof(buf));
+	GetWindowText(devpane->ui.edit.accel[2], buf, _tsizeof(buf));
 	accel[2] = _tstoi(buf);
 
-	inSetDeviceSpeed(device->hDevice, speed, accel[0], accel[1], accel[2]);
+	devSetMouseParams(devpane->devinfo, speed, accel[0], accel[1], accel[2]);
 }
 
 /***************
@@ -171,14 +172,14 @@ static LRESULT CALLBACK _WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 
 	switch (uMsg) {
 	case WM_CREATE:
-		CHECK_ERROR_EXIT(inRegisterMice(hWnd) == FALSE, -3, L"could not register raw input device");
+		CHECK_ERROR_EXIT(devRegisterMice(hWnd) == FALSE, -3, L"could not register raw input device");
 		break;
 	case WM_CTLCOLORSTATIC:
 		//dprintf(L"WM_CTLCOLORSTATIC: (%x) %x %x %x\n", (UINT)hWnd, uMsg, wParam, lParam);
-		_ui_device_t *dev = _getDeviceByPane((HWND)lParam);
-		if (dev) {
-			if (dev == _active_device) {
-				//dprintf(L"pane dev: %x\n", dev->name);
+		_device_pane_t *devpane = _devPaneByHwnd((HWND)lParam);
+		if (devpane) {
+			if (devpane == _active_pane) {
+				//dprintf(L"pane dev: %x\n", dev->nice_name);
 				SetBkColor((HDC)wParam, ACTIVE_COLOR);
 				return (INT_PTR)_fills.active;
 			} else {
@@ -191,7 +192,7 @@ static LRESULT CALLBACK _WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 		}
 		//SetTextColor((HDC)wParam, RGB(0, 0, 0));
 	case WM_INPUT:
-		inProcessRawInput((HRAWINPUT)lParam);
+		devProcessRawInput((HRAWINPUT)lParam);
 		break;
 	case WM_DESTROY:
 		PostQuitMessage(0);
@@ -206,21 +207,21 @@ static LRESULT CALLBACK _WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 static LRESULT CALLBACK _paneWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 	//dprintf(L"paneproc: (%x) %x %x %x\n", (UINT)hWnd, uMsg, wParam, lParam);
 
-	_ui_device_t *dev = _getDeviceByPane(hWnd);
-	if (!dev)
-		return CallWindowProc(dev->ui.oldproc, hWnd, uMsg, wParam, lParam);
+	_device_pane_t *devpane = _devPaneByHwnd(hWnd);
+	if (!devpane)
+		return CallWindowProc(devpane->ui.oldproc, hWnd, uMsg, wParam, lParam);
 
 	switch (uMsg) {
 	case WM_COMMAND:
 		//dprintf(L"sWM_COMMAND: (%x) %x %x %x\n", (UINT)hWnd, uMsg, wParam, lParam);
-		if ((HWND)lParam == dev->ui.button.set) {
-			_updateSettings(dev);
-			dprintf(L"saving %s\n", dev->name);
+		if ((HWND)lParam == devpane->ui.button.set) {
+			dprintf(L"saving %s\n", devpane->nice_name);
+			_updateSettings(devpane);
 		}
 		break;
 	case WM_CTLCOLORSTATIC:
 		//dprintf(L"sWM_CTLCOLORSTATIC: (%x) %x %x %x\n", (UINT)hWnd, uMsg, wParam, lParam);
-		if (dev == _active_device) {
+		if (devpane == _active_pane) {
 			SetBkColor((HDC)wParam, ACTIVE_COLOR);
 			return (INT_PTR)_fills.active;
 		} else {
@@ -239,7 +240,7 @@ static LRESULT CALLBACK _paneWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
 	//	SetBkColor((HDC)wParam, ACTIVE_COLOR);
 	//	return 0;
 	}
-	return CallWindowProc(dev->ui.oldproc, hWnd, uMsg, wParam, lParam);
+	return CallWindowProc(devpane->ui.oldproc, hWnd, uMsg, wParam, lParam);
 }
 
 /**********
@@ -250,7 +251,7 @@ HWND uiInit(HINSTANCE hInstance) {
 	WNDCLASS wc = { 0 };
 
 	_num_devices = 0;
-	_active_device = NULL;
+	_active_pane = NULL;
 	_fills.window = CreateSolidBrush(WINDOW_COLOR);
 	_fills.active = CreateSolidBrush(ACTIVE_COLOR);
 	_fills.inactive = CreateSolidBrush(INACTIVE_COLOR);
@@ -278,17 +279,17 @@ HWND uiInit(HINSTANCE hInstance) {
 	return _window;
 }
 
-BOOL uiSetDevice(HANDLE hDevice) {
-	if (!hDevice)
+BOOL uiSetActive(device_info_t *devinfo) {
+	if (!devinfo)
 		return FALSE;
 
-	_ui_device_t *dev = _getDeviceByHandle(hDevice);
-	if (!dev) {
-		dev = _addDevice(hDevice);
-		_setActive(dev);
-		_createDevicePane(dev);
+	_device_pane_t *devpane = _devPaneByDevInfo(devinfo);
+	if (!devpane) {
+		devpane = _addDevicePane(devinfo);
+		_setActivePane(devpane);
+		_createDevicePane(devpane);
 	} else {
-		_setActive(dev);
+		_setActivePane(devpane);
 	}
 
 	return TRUE;

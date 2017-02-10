@@ -6,7 +6,7 @@
 #include <tchar.h>
 
 #include "definitions.h"
-#include "input.h"
+#include "device.h"
 #include "ui.h"
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInst, LPSTR lpCmdLine, int nCmdShow) {
@@ -18,7 +18,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInst, LPSTR lpCmdLine, in
 	FILE *stream;
 	if (AttachConsole(ATTACH_PARENT_PROCESS)) {
 		freopen_s(&stream, "CON", "w", stdout);
-		inPrintDevices();
+		devPrintDevices();
 	}
 #endif
 

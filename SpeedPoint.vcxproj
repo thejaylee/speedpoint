@@ -148,14 +148,16 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="input.c" />
+    <ClCompile Include="device.c" />
     <ClCompile Include="speedpoint.c" />
+    <ClCompile Include="store.c" />
     <ClCompile Include="ui.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="definitions.h" />
-    <ClInclude Include="input.h" />
+    <ClInclude Include="device.h" />
     <ClInclude Include="resource.h" />
+    <ClInclude Include="store.h" />
     <ClInclude Include="ui.h" />
   </ItemGroup>
   <ItemGroup>

@@ -20,5 +20,7 @@
 
 typedef struct {
 	HANDLE hDevice;
-	TCHAR  name[256];
-} device_t;
+	TCHAR  name[256]; // this has to stay a fixed array or many _tsizeof() calls on it will return bad results
+	UINT   speed;
+	UINT   accel[3];
+} device_info_t;

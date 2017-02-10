@@ -1,22 +1,26 @@
-#include "input.h"
-#include "definitions.h"
+#include "device.h"
 #include "ui.h"
 
+#define DEFAULT_SPEED 8
+#define DEFAULT_ACCEL_LOW 6
+#define DEFAULT_ACCEL_HIGH 10
+#define DEFAULT_ACCEL_STATE 0
+
 //#define DEVICE_TYPENAME (const TCHAR*[3]) { L"mouse",L"keyboard",L"hid" }
-const TCHAR *dev_typename[] = { L"mouse",L"keyboard",L"hid" };
+static const TCHAR *dev_typename[] = { L"mouse",L"keyboard",L"hid" };
 
-typedef struct {
-	HANDLE hDevice;
-	UINT speed;
-	UINT accel[3];
-} _devinfo_t;
-
-static _devinfo_t _devices[MAX_DEVICES];
 static UINT _num_devices = 0;
+static device_info_t _devices[MAX_DEVICES];
 
+/**********
+* STATIC *
+**********/
 
+static _updateSystemParams(device_info_t *device) {
+	return SystemParametersInfo(SPI_SETMOUSESPEED, 0, (PVOID)device->speed, SPIF_SENDCHANGE) & SystemParametersInfo(SPI_SETMOUSE, 0, device->accel, SPIF_SENDCHANGE);
+}
 
-static _devinfo_t *_getDeviceByHandle(HANDLE hDevice) {
+device_info_t *devGetByHandle(HANDLE hDevice) {
 	for (UINT c = 0; c < _num_devices; c++) {
 		if (_devices[c].hDevice == hDevice)
 			return &_devices[c];
@@ -25,11 +29,28 @@ static _devinfo_t *_getDeviceByHandle(HANDLE hDevice) {
 	return NULL;
 }
 
-static _devinfo_t *_addDevice(HANDLE hDevice) {
-	return (_devices[++_num_devices].hDevice = hDevice);
+/**********
+* GLOBALS *
+**********/
+
+device_info_t *devAdd(HANDLE hDevice) {
+	device_info_t *devinfo;
+	UINT bufsz = _tsizeof(devinfo->name);
+	devinfo = &_devices[_num_devices++];
+	devinfo->hDevice = hDevice;
+	devinfo->speed = DEFAULT_SPEED;
+	devinfo->accel[0] = DEFAULT_ACCEL_LOW;
+	devinfo->accel[1] = DEFAULT_ACCEL_HIGH;
+	devinfo->accel[2] = DEFAULT_ACCEL_STATE;
+	GetRawInputDeviceInfo(hDevice, RIDI_DEVICENAME, devinfo->name, &bufsz);
+	return devinfo;
 }
 
-void inPrintDevices(void) {
+UINT devCount(void) {
+	return _num_devices;
+}
+
+void devPrintDevices(void) {
 	UINT num_devices;
 	PRAWINPUTDEVICELIST devices;
 
@@ -57,18 +78,9 @@ void inPrintDevices(void) {
 	}
 }
 
-/**
-* @param[in]  hDevice   a HANDLE to the device
-* @param[out] name      pointer to a character buffer to hold device name
-* @param[in]  strlen	length (in characters) of the buffer
-*/
-UINT inGetDeviceName(HANDLE hDevice, TCHAR *name, UINT strlen) {
-	return GetRawInputDeviceInfo(hDevice, RIDI_DEVICENAME, name, &strlen);
-}
-
 //void inGetDevices(DWORD dwType, HANDLE *deviceList, UINT count) {}
 
-BOOL inRegisterMice(HWND hWnd) {
+BOOL devRegisterMice(HWND hWnd) {
 	RAWINPUTDEVICE rid;
 	rid.usUsagePage = 0x01;
 	rid.usUsage = 0x02;
@@ -78,7 +90,9 @@ BOOL inRegisterMice(HWND hWnd) {
 	return RegisterRawInputDevices(&rid, 1, sizeof(RAWINPUTDEVICE));
 }
 
-void inProcessRawInput(HRAWINPUT hRawInput) {
+void devProcessRawInput(HRAWINPUT hRawInput) {
+	static device_info_t *lastDev;
+	device_info_t *devinfo = NULL;
 	UINT     sz;
 	RAWINPUT raw;
 
@@ -104,28 +118,29 @@ void inProcessRawInput(HRAWINPUT hRawInput) {
 		GetRawInputDeviceInfo(raw->header.hDevice, RIDI_DEVICEINFO, &devinfo, &datasz);
 		dprintf(L"device: %d %s\n", devinfo.mouse.dwId, devname);*/
 
-		if (!_getDeviceByHandle(raw.header.hDevice)) {
-			_addDevice(raw.header.hDevice);
+		if (!lastDev || raw.header.hDevice != lastDev->hDevice) {
+			if ((devinfo = devGetByHandle(raw.header.hDevice)) == NULL) {
+				dprintf(L"new device:\n");
+				devinfo = devAdd(raw.header.hDevice);
+			}
+			uiSetActive(devinfo); // ui maintains it's own device cache, can call without checking ours
+			_updateSystemParams(devinfo);
 		}
-		uiSetDevice(raw.header.hDevice); // ui maintains it's own device cache, can call without checking ours
+		lastDev = devinfo;
 	}
 
 	//DefRawInputProc(&raw, 1, sizeof(RAWINPUTHEADER));
 }
 
-BOOL inSetDeviceSpeed(HANDLE hDevice, UINT speed, UINT accel1, UINT accel2, UINT accel3) {
-	UINT accel[3];
-	_devinfo_t *dev;
-
-	dev = _getDeviceByHandle(hDevice);
-	if (!dev)
+BOOL devSetMouseParams(device_info_t *devinfo, UINT speed, UINT accel1, UINT accel2, UINT accel3) {
+	if (!devinfo)
 		return FALSE;
 
-	accel[0] = accel1;
-	accel[1] = accel2;
-	accel[2] = accel3;
+	devinfo->speed = speed;
+	devinfo->accel[0] = accel1;
+	devinfo->accel[1] = accel2;
+	devinfo->accel[2] = accel3;
 
 	dprintf(L"mouseparams: speed: %u accel: %u %u %u\n", speed, accel1, accel2, accel3);
-	//return SystemParametersInfo(SPI_SETMOUSESPEED, 0, (PVOID)*speed, SPIF_SENDCHANGE) & SystemParametersInfo(SPI_SETMOUSE, 0, accel, SPIF_SENDCHANGE);
-	return TRUE;
+	return _updateSystemParams(devinfo);
 }
