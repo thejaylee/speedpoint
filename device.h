@@ -8,4 +8,4 @@ UINT devCount(void);
 device_info_t *devGetByHandle(HANDLE hDevice);
 BOOL devRegisterMice(HWND hWnd);
 void devProcessRawInput(HRAWINPUT hRawInput);
-BOOL devSetMouseParams(device_info_t *device, UINT speed, UINT accel1, UINT accel2, UINT accel3);
+BOOL devSetMouseParams(device_info_t *device, UINT speed, UINT accel[]);

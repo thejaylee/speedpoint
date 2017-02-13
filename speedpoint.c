@@ -7,6 +7,7 @@
 
 #include "definitions.h"
 #include "device.h"
+#include "persist.h"
 #include "ui.h"
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInst, LPSTR lpCmdLine, int nCmdShow) {
@@ -22,6 +23,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInst, LPSTR lpCmdLine, in
 	}
 #endif
 
+	dprintf(L"loaded %d device settings from file\n", perLoadFile());
 	hWnd = uiInit();
 
 	dprintf(L"entering message loop\n");

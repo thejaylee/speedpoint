@@ -1,4 +1,5 @@
 #include "device.h"
+#include "persist.h"
 #include "ui.h"
 
 #define DEFAULT_SPEED 8
@@ -16,8 +17,9 @@ static device_info_t _devices[MAX_DEVICES];
 * STATIC *
 **********/
 
-static _updateSystemParams(device_info_t *device) {
-	return SystemParametersInfo(SPI_SETMOUSESPEED, 0, (PVOID)device->speed, SPIF_SENDCHANGE) & SystemParametersInfo(SPI_SETMOUSE, 0, device->accel, SPIF_SENDCHANGE);
+static _updateSystemParams(device_info_t *devinfo) {
+	dprintf(L"setting speed: %u accel: %u %u %u\n", devinfo->speed, devinfo->accel[0], devinfo->accel[1], devinfo->accel[2]);
+	return SystemParametersInfo(SPI_SETMOUSESPEED, 0, (PVOID)devinfo->speed, SPIF_SENDCHANGE) & SystemParametersInfo(SPI_SETMOUSE, 0, devinfo->accel, SPIF_SENDCHANGE);
 }
 
 device_info_t *devGetByHandle(HANDLE hDevice) {
@@ -36,13 +38,20 @@ device_info_t *devGetByHandle(HANDLE hDevice) {
 device_info_t *devAdd(HANDLE hDevice) {
 	device_info_t *devinfo;
 	UINT bufsz = _tsizeof(devinfo->name);
+	if (_num_devices >= MAX_DEVICES) {
+		dprintf(L"device limit maxed out\n");
+		return NULL;
+	}
+
 	devinfo = &_devices[_num_devices++];
 	devinfo->hDevice = hDevice;
-	devinfo->speed = DEFAULT_SPEED;
-	devinfo->accel[0] = DEFAULT_ACCEL_LOW;
-	devinfo->accel[1] = DEFAULT_ACCEL_HIGH;
-	devinfo->accel[2] = DEFAULT_ACCEL_STATE;
 	GetRawInputDeviceInfo(hDevice, RIDI_DEVICENAME, devinfo->name, &bufsz);
+	if (perGetMouseParams(devinfo->name, &devinfo->speed, devinfo->accel) == FALSE) {
+		devinfo->speed = DEFAULT_SPEED;
+		devinfo->accel[0] = DEFAULT_ACCEL_LOW;
+		devinfo->accel[1] = DEFAULT_ACCEL_HIGH;
+		devinfo->accel[2] = DEFAULT_ACCEL_STATE;
+	}
 	return devinfo;
 }
 
@@ -107,6 +116,8 @@ void devProcessRawInput(HRAWINPUT hRawInput) {
 	}
 
 	if (raw.header.dwType == RIM_TYPEMOUSE) {
+		/*if (lastDev)
+			dprintf(L"%x %x %x\n", (UINT)lastDev, (UINT)lastDev->hDevice, (UINT)raw.header.hDevice);*/
 		//dprintf(L"device: %x\n", raw->header.hDevice);
 		/*UINT            datasz = 256;
 		TCHAR           devname[256] = { 0 };
@@ -120,27 +131,28 @@ void devProcessRawInput(HRAWINPUT hRawInput) {
 
 		if (!lastDev || raw.header.hDevice != lastDev->hDevice) {
 			if ((devinfo = devGetByHandle(raw.header.hDevice)) == NULL) {
-				dprintf(L"new device:\n");
 				devinfo = devAdd(raw.header.hDevice);
+				dprintf(L"new device: %s\n", devinfo->name);
 			}
-			uiSetActive(devinfo); // ui maintains it's own device cache, can call without checking ours
+			dprintf(L"active device: %s\n", devinfo->name);
 			_updateSystemParams(devinfo);
+			uiSetActive(devinfo); // ui maintains it's own device cache, can call without checking ours
+			lastDev = devinfo;
 		}
-		lastDev = devinfo;
 	}
 
 	//DefRawInputProc(&raw, 1, sizeof(RAWINPUTHEADER));
 }
 
-BOOL devSetMouseParams(device_info_t *devinfo, UINT speed, UINT accel1, UINT accel2, UINT accel3) {
+BOOL devSetMouseParams(device_info_t *devinfo, UINT speed, UINT accel[]) {
 	if (!devinfo)
 		return FALSE;
 
 	devinfo->speed = speed;
-	devinfo->accel[0] = accel1;
-	devinfo->accel[1] = accel2;
-	devinfo->accel[2] = accel3;
+	devinfo->accel[0] = accel[0];
+	devinfo->accel[1] = accel[1];
+	devinfo->accel[2] = accel[2];
 
-	dprintf(L"mouseparams: speed: %u accel: %u %u %u\n", speed, accel1, accel2, accel3);
-	return _updateSystemParams(devinfo);
+	dprintf(L"mouseparams: speed: %u accel: %u %u %u\n", speed, accel[0], accel[1], accel[2]);
+	return TRUE;
 }

@@ -21,10 +21,10 @@
     <ClCompile Include="ui.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="store.c">
+    <ClCompile Include="device.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="device.c">
+    <ClCompile Include="persist.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -38,10 +38,10 @@
     <ClInclude Include="definitions.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="store.h">
+    <ClInclude Include="device.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="device.h">
+    <ClInclude Include="persist.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

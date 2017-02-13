@@ -1,5 +1,6 @@
 #include "ui.h"
 #include "device.h"
+#include "persist.h"
 
 #define WINDOW_WIDTH 400
 #define PANE_HEIGHT 55
@@ -10,7 +11,7 @@
 
 typedef struct {
 	device_info_t *devinfo;
-	TCHAR  nice_name[256];
+	TCHAR  nice_name[NAME_MAX_LENGTH];
 	struct {
 		HWND pane;
 		WNDPROC oldproc;
@@ -100,7 +101,7 @@ static BOOL _setActivePane(_device_pane_t *devpane) {
 			UpdateWindow(_devpanes[c].ui.pane);
 		}
 	}
-	dprintf(L"active device: %s\n", devpane->nice_name);
+	dprintf(L"active pane: (%x) %s\n", (UINT)devpane->ui.pane, devpane->nice_name);
 	return TRUE;
 }
 
@@ -161,7 +162,8 @@ static void _updateSettings(_device_pane_t *devpane) {
 	GetWindowText(devpane->ui.edit.accel[2], buf, _tsizeof(buf));
 	accel[2] = _tstoi(buf);
 
-	devSetMouseParams(devpane->devinfo, speed, accel[0], accel[1], accel[2]);
+	devSetMouseParams(devpane->devinfo, speed, accel);
+	perSetMouseParams(devpane->devinfo->name, speed, accel);
 }
 
 /***************
