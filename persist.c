@@ -27,7 +27,7 @@ INT perLoadFile() {
 	ERROR_RETURN(_tfopen_s(&fp, PERSIST_FILENAME, L"r"), -1, L"ERROR: could not open settings file\n");
 
 	_freeList();
-	while (_fgetts(buf, _tsizeof(buf), fp)) {
+	while (_fgetts(buf, _countof(buf), fp)) {
 		if (!firstdev) {
 			firstdev = malloc(sizeof(persist_device_t));
 			memset(firstdev, 0, sizeof(persist_device_t));

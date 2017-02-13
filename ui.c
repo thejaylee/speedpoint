@@ -83,7 +83,7 @@ static _device_pane_t* _addDevicePane(device_info_t *devinfo) {
 	devpane->devinfo = devinfo;
 	// set the (display) device name to only the relevant bits
 	for (end = devinfo->name; *end != L'{' && end < devinfo->name+ sizeof(devinfo->name); end++);
-	_tcsncpy_s(devpane->nice_name, _tsizeof(devpane->nice_name), &devinfo->name[4], (end - &devinfo->name[4]));
+	_tcsncpy_s(devpane->nice_name, _countof(devpane->nice_name), &devinfo->name[4], (end - &devinfo->name[4]));
 	return devpane;
 }
 
@@ -125,13 +125,13 @@ static void _createDevicePane(_device_pane_t *devpane) {
 	devpane->ui.label.speed = CreateWindow(L"STATIC", L"speed", WS_VISIBLE | WS_CHILD | SS_NOPREFIX | SS_LEFTNOWORDWRAP, 15, 28, 40, 18, devpane->ui.pane, NULL, hInstance, NULL);
 	devpane->ui.label.accel = CreateWindow(L"STATIC", L"accel", WS_VISIBLE | WS_CHILD | SS_NOPREFIX | SS_LEFTNOWORDWRAP, 100, 28, 35, 18, devpane->ui.pane, NULL, hInstance, NULL);
 	// edits
-	_stprintf_s(buf, _tsizeof(buf), L"%d", devpane->devinfo->speed);
+	_stprintf_s(buf, _countof(buf), L"%d", devpane->devinfo->speed);
 	devpane->ui.edit.speed = CreateWindow(L"EDIT", buf, WS_VISIBLE | WS_CHILD | WS_TABSTOP | WS_BORDER | ES_NUMBER | ES_CENTER, 60, 27, 25, 20, devpane->ui.pane, NULL, hInstance, NULL);
-	_stprintf_s(buf, _tsizeof(buf), L"%d", devpane->devinfo->accel[0]);
+	_stprintf_s(buf, _countof(buf), L"%d", devpane->devinfo->accel[0]);
 	devpane->ui.edit.accel[0] = CreateWindow(L"EDIT", buf, WS_VISIBLE | WS_CHILD | WS_TABSTOP | WS_BORDER | ES_NUMBER | ES_CENTER, 140, 27, 25, 20, devpane->ui.pane, NULL, hInstance, NULL);
-	_stprintf_s(buf, _tsizeof(buf), L"%d", devpane->devinfo->accel[1]);
+	_stprintf_s(buf, _countof(buf), L"%d", devpane->devinfo->accel[1]);
 	devpane->ui.edit.accel[1] = CreateWindow(L"EDIT", buf, WS_VISIBLE | WS_CHILD | WS_TABSTOP | WS_BORDER | ES_NUMBER | ES_CENTER, 170, 27, 25, 20, devpane->ui.pane, NULL, hInstance, NULL);
-	_stprintf_s(buf, _tsizeof(buf), L"%d", devpane->devinfo->accel[2]);
+	_stprintf_s(buf, _countof(buf), L"%d", devpane->devinfo->accel[2]);
 	devpane->ui.edit.accel[2] = CreateWindow(L"EDIT", buf, WS_VISIBLE | WS_CHILD | WS_TABSTOP | WS_BORDER | ES_NUMBER | ES_CENTER, 200, 27, 25, 20, devpane->ui.pane, NULL, hInstance, NULL);
 	// buttons
 	devpane->ui.button.set = CreateWindow(L"BUTTON", L"Set", WS_VISIBLE | WS_CHILD | WS_TABSTOP | BS_PUSHBUTTON | BS_FLAT, 325, 27, 40, 20, devpane->ui.pane, NULL, hInstance, NULL);
@@ -153,13 +153,13 @@ static void _updateSettings(_device_pane_t *devpane) {
 	TCHAR buf[16];
 	UINT speed, accel[3];
 
-	GetWindowText(devpane->ui.edit.speed, buf, _tsizeof(buf));
+	GetWindowText(devpane->ui.edit.speed, buf, _countof(buf));
 	speed = _tstoi(buf);
-	GetWindowText(devpane->ui.edit.accel[0], buf, _tsizeof(buf));
+	GetWindowText(devpane->ui.edit.accel[0], buf, _countof(buf));
 	accel[0] = _tstoi(buf);
-	GetWindowText(devpane->ui.edit.accel[1], buf, _tsizeof(buf));
+	GetWindowText(devpane->ui.edit.accel[1], buf, _countof(buf));
 	accel[1] = _tstoi(buf);
-	GetWindowText(devpane->ui.edit.accel[2], buf, _tsizeof(buf));
+	GetWindowText(devpane->ui.edit.accel[2], buf, _countof(buf));
 	accel[2] = _tstoi(buf);
 
 	devSetMouseParams(devpane->devinfo, speed, accel);

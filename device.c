@@ -2,7 +2,7 @@
 #include "persist.h"
 #include "ui.h"
 
-#define DEFAULT_SPEED 8
+#define DEFAULT_SPEED 6
 #define DEFAULT_ACCEL_LOW 6
 #define DEFAULT_ACCEL_HIGH 10
 #define DEFAULT_ACCEL_STATE 0
@@ -37,7 +37,7 @@ device_info_t *devGetByHandle(HANDLE hDevice) {
 
 device_info_t *devAdd(HANDLE hDevice) {
 	device_info_t *devinfo;
-	UINT bufsz = _tsizeof(devinfo->name);
+	UINT bufsz = _countof(devinfo->name);
 	if (_num_devices >= MAX_DEVICES) {
 		dprintf(L"device limit maxed out\n");
 		return NULL;
