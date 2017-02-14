@@ -1,8 +1,12 @@
 #include "ui.h"
 #include "device.h"
 #include "persist.h"
+#include "resource.h"
 
-#define WINDOW_WIDTH 400
+#define TRAY_UID 0x8cec64ba
+#define SWM_TRAY WM_APP + 0x00
+
+#define WINDOW_WIDTH 450
 #define PANE_HEIGHT 55
 
 #define WINDOW_COLOR   RGB(240,240,240)
@@ -40,6 +44,7 @@ static _device_pane_t _devpanes[MAX_DEVICES] = { 0 };
 static _device_pane_t *_active_pane = NULL;
 static UINT _num_devices = 0;
 static HWND _window;
+static NOTIFYICONDATA _tray;
 
 /*************
 * PROTOTYPES *
@@ -166,6 +171,23 @@ static void _updateSettings(_device_pane_t *devpane) {
 	perSetMouseParams(devpane->devinfo->name, speed, accel);
 }
 
+static void _initTray(HINSTANCE hInst, HWND hWnd) {
+	HICON icon;
+	icon = (HICON) LoadImage(hInst, MAKEINTRESOURCE(IDI_TRAYICON), IMAGE_ICON, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_DEFAULTCOLOR);
+
+	memset(&_tray, 0, sizeof(NOTIFYICONDATA));
+	_tray.cbSize = NOTIFYICONDATA_V1_SIZE;
+	_tray.hWnd = hWnd;
+	_tray.uID = TRAY_UID;
+	_tray.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
+	_tray.uCallbackMessage = SWM_TRAY;
+	_tray.hIcon = icon;
+	_tcscpy_s(_tray.szTip, sizeof(_tray.szTip), L"SpeedPoint");
+
+	Shell_NotifyIcon(NIM_ADD, &_tray);
+	DeleteObject(icon);
+}
+
 /***************
 * WINDOW PROCS *
 ****************/
@@ -196,7 +218,20 @@ static LRESULT CALLBACK _WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 	case WM_INPUT:
 		devProcessRawInput((HRAWINPUT)lParam);
 		break;
+	case SWM_TRAY:
+		switch (lParam) {
+		/*case WM_LBUTTONDOWN:
+			break;
+		case WM_LBUTTONDBLCLK:
+			break;*/
+		case WM_RBUTTONUP:
+			uiTerminate();
+			PostQuitMessage(0);
+			break;
+		}
+		break;
 	case WM_DESTROY:
+		uiTerminate();
 		PostQuitMessage(0);
 		break;
 	default:
@@ -262,6 +297,7 @@ HWND uiInit(HINSTANCE hInstance) {
 	wc.hInstance = hInstance;
 	wc.lpszClassName = UI_WINDOW_CLASS_NAME;
 	wc.hbrBackground = (HBRUSH) COLOR_BACKGROUND;
+	wc.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_TRAYICON));
 	CHECK_ERROR_EXIT(RegisterClass(&wc) == 0, -1, L"could not register class"); // now that the class is registered we create the window
 	_window = CreateWindowEx(
 		0,
@@ -278,7 +314,14 @@ HWND uiInit(HINSTANCE hInstance) {
 		NULL);
 	CHECK_ERROR_EXIT(_window == NULL, -2, L"could not create window");
 
+	_initTray(hInstance, _window);
+
 	return _window;
+}
+
+void uiTerminate() {
+	DestroyWindow(_window);
+	Shell_NotifyIcon(NIM_DELETE, &_tray);
 }
 
 BOOL uiSetActive(device_info_t *devinfo) {

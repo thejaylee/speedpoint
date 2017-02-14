@@ -163,6 +163,9 @@
   <ItemGroup>
     <ResourceCompile Include="SpeedPoint.rc" />
   </ItemGroup>
+  <ItemGroup>
+    <Image Include="speedpoint.ico" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

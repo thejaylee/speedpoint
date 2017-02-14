@@ -8,3 +8,4 @@
 
 HWND uiInit();
 BOOL uiSetActive(device_info_t *dev);
+void uiTerminate();

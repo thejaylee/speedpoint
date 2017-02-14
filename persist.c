@@ -53,6 +53,7 @@ INT perSaveFile() {
 
 	_tfopen_s(&fp, PERSIST_FILENAME, L"w");
 	for (persist_device_t *pdev = firstdev; pdev; pdev = pdev->next) {
+		count++;
 		_ftprintf_s(fp, L"%s %u %u %u %u\n", pdev->name, pdev->speed, pdev->accel[0], pdev->accel[1], pdev->accel[2]);
 	}
 	fclose(fp);
@@ -91,7 +92,9 @@ void perSetMouseParams(const TCHAR *devname, UINT speed, UINT accel[]) {
 		pdev = pdev->next;
 	}
 
-	pdev = malloc(sizeof(persist_device_t));
+	dprintf(L"persist new(f): %s %u %u %u %u\n", devname, speed, accel[0], accel[1], accel[2]);
+	firstdev = malloc(sizeof(persist_device_t));
+	pdev = firstdev;
 	memset(pdev, 0, sizeof(persist_device_t));
 copyname:
 	_tcscpy_s(pdev->name, _countof(pdev->name), devname);
