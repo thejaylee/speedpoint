@@ -2,16 +2,15 @@
 #include "persist.h"
 #include "ui.h"
 
-#define DEFAULT_SPEED 6
-#define DEFAULT_ACCEL_LOW 6
-#define DEFAULT_ACCEL_HIGH 10
-#define DEFAULT_ACCEL_STATE 0
-
 //#define DEVICE_TYPENAME (const TCHAR*[3]) { L"mouse",L"keyboard",L"hid" }
 static const TCHAR *dev_typename[] = { L"mouse",L"keyboard",L"hid" };
 
 static UINT _num_devices = 0;
 static device_info_t _devices[MAX_DEVICES];
+static struct {
+	UINT speed;
+	UINT accel[3];
+} _default = { 6, 4, 10, 0 };
 
 /**********
 * STATIC *
@@ -47,10 +46,10 @@ device_info_t *devAdd(HANDLE hDevice) {
 	devinfo->hDevice = hDevice;
 	GetRawInputDeviceInfo(hDevice, RIDI_DEVICENAME, devinfo->name, &bufsz);
 	if (perGetMouseParams(devinfo->name, &devinfo->speed, devinfo->accel) == FALSE) {
-		devinfo->speed = DEFAULT_SPEED;
-		devinfo->accel[0] = DEFAULT_ACCEL_LOW;
-		devinfo->accel[1] = DEFAULT_ACCEL_HIGH;
-		devinfo->accel[2] = DEFAULT_ACCEL_STATE;
+		devinfo->speed = _default.speed;
+		devinfo->accel[0] = _default.accel[0];
+		devinfo->accel[1] = _default.accel[1];
+		devinfo->accel[2] = _default.accel[2];
 	}
 	return devinfo;
 }
@@ -155,4 +154,9 @@ BOOL devSetMouseParams(device_info_t *devinfo, UINT speed, UINT accel[]) {
 
 	dprintf(L"mouseparams: speed: %u accel: %u %u %u\n", speed, accel[0], accel[1], accel[2]);
 	return TRUE;
+}
+
+void devInit() {
+	SystemParametersInfo(SPI_GETMOUSESPEED, 0, (PVOID)_default.speed, 0);
+	SystemParametersInfo(SPI_GETMOUSE, 0, _default.accel, 0);
 }

@@ -314,7 +314,7 @@ HWND uiInit(HINSTANCE hInstance) {
 		NULL);
 	CHECK_ERROR_EXIT(_window == NULL, -2, L"could not create window");
 
-	_initTray(hInstance, _window);
+	//_initTray(hInstance, _window);
 
 	return _window;
 }

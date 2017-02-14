@@ -23,7 +23,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInst, LPSTR lpCmdLine, in
 	}
 #endif
 
+#ifdef _DEBUG
 	dprintf(L"loaded %d device settings from file\n", perLoadFile());
+#else
+	perLoadFile();
+#endif
+	devInit();
 	hWnd = uiInit();
 
 	dprintf(L"entering message loop\n");
