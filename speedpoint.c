@@ -29,7 +29,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInst, LPSTR lpCmdLine, in
 	perLoadFile();
 #endif
 	devInit();
-	hWnd = uiInit();
+	hWnd = uiInit(hInstance);
 
 	dprintf(L"entering message loop\n");
 	while ((bRet = GetMessage(&msg, hWnd, 0, 0)) != 0) {

@@ -122,7 +122,7 @@ static void _createDevicePane(_device_pane_t *devpane) {
 	wc.lpfnWndProc = _paneWndProc;
 	wc.hbrBackground = (HBRUSH)COLOR_WINDOW;
 	RegisterClass(&wc);*/
-	devpane->ui.pane = CreateWindow(L"STATIC", L"", WS_VISIBLE | WS_CHILD, 5, ROFF + 5, WINDOW_WIDTH - 22, PANE_HEIGHT, _window, NULL, hInstance, NULL);
+	devpane->ui.pane = CreateWindow(L"STATIC", L"", WS_VISIBLE | WS_CHILD, 0, ROFF, WINDOW_WIDTH, PANE_HEIGHT, _window, NULL, hInstance, NULL);
 	devpane->ui.oldproc = (WNDPROC)SetWindowLongPtr(devpane->ui.pane, GWLP_WNDPROC, (LONG)_paneWndProc);
 	dprintf(L"devpane pane: %x\n", (UINT)devpane->ui.pane);
 	// labels
@@ -143,7 +143,7 @@ static void _createDevicePane(_device_pane_t *devpane) {
 
 	RECT r;
 	GetWindowRect(_window, &r);
-	//dprintf(L"%d %d %d %d\n", r.left, r.right, r.top, r.bottom);
+	dprintf(L"%d %d %d %d\n", r.left, r.right, r.top, r.bottom);
 	MoveWindow(_window, r.left, r.top, WINDOW_WIDTH, r.bottom - r.top + PANE_HEIGHT, FALSE);
 	InvalidateRect(_window, NULL, TRUE);
 	UpdateWindow(_window);
@@ -173,7 +173,9 @@ static void _updateSettings(_device_pane_t *devpane) {
 
 static void _initTray(HINSTANCE hInst, HWND hWnd) {
 	HICON icon;
-	icon = (HICON) LoadImage(hInst, MAKEINTRESOURCE(IDI_TRAYICON), IMAGE_ICON, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_DEFAULTCOLOR);
+	//dprintf(L"system small icon size: %dx%d\n", GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON));
+	icon = (HICON) LoadImage(hInst, MAKEINTRESOURCE(IDI_TRAYICON), IMAGE_ICON, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_DEFAULTCOLOR | LR_SHARED);
+	CHECK_ERROR_EXIT(icon == NULL, -1000, L"Could not load icon");
 
 	memset(&_tray, 0, sizeof(NOTIFYICONDATA));
 	_tray.cbSize = NOTIFYICONDATA_V1_SIZE;
@@ -215,14 +217,19 @@ static LRESULT CALLBACK _WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 			return (INT_PTR)_fills.active;
 		}
 		//SetTextColor((HDC)wParam, RGB(0, 0, 0));
+	case WM_CLOSE:
+		ShowWindow(hWnd, SW_HIDE);
+		break;
 	case WM_INPUT:
 		devProcessRawInput((HRAWINPUT)lParam);
 		break;
 	case SWM_TRAY:
 		switch (lParam) {
-		/*case WM_LBUTTONDOWN:
+		case WM_LBUTTONDOWN:
+			ShowWindow(hWnd, SW_SHOW);
+			SetForegroundWindow(hWnd);
 			break;
-		case WM_LBUTTONDBLCLK:
+		/*case WM_LBUTTONDBLCLK:
 			break;*/
 		case WM_RBUTTONUP:
 			uiTerminate();
@@ -300,10 +307,10 @@ HWND uiInit(HINSTANCE hInstance) {
 	wc.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_TRAYICON));
 	CHECK_ERROR_EXIT(RegisterClass(&wc) == 0, -1, L"could not register class"); // now that the class is registered we create the window
 	_window = CreateWindowEx(
-		0,
+		WS_EX_NOACTIVATE,
 		wc.lpszClassName,
 		UI_WINDOW_NAME,
-		WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_VISIBLE,
+		WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_VISIBLE /*| WS_MINIMIZEBOX*/,
 		CW_USEDEFAULT,
 		CW_USEDEFAULT,
 		WINDOW_WIDTH,
@@ -314,8 +321,10 @@ HWND uiInit(HINSTANCE hInstance) {
 		NULL);
 	CHECK_ERROR_EXIT(_window == NULL, -2, L"could not create window");
 
-	//_initTray(hInstance, _window);
+	// init the window to zero height so the additive calculations for panes will be okay later
+	MoveWindow(_window, 0, 0, WINDOW_WIDTH, 0, FALSE);
 
+	_initTray(hInstance, _window);
 	return _window;
 }
 
